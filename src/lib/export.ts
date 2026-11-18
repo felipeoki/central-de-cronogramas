@@ -107,6 +107,16 @@ export function projectCsv(p: Project): string {
         ]),
       );
   }
+  const daysOff = [
+    ...p.calendar.holidays.map((h) => [formatDate(h.date), formatDate(h.date), h.reason]),
+    ...p.calendar.blackouts
+      .filter((r) => r.start && r.end)
+      .map((r) => [formatDate(r.start), formatDate(r.end), r.description]),
+  ];
+  if (daysOff.length) {
+    lines.push("", row(["Dias sem trabalho"]), row(["De", "Até", "Observação"]));
+    for (const d of daysOff) lines.push(row(d));
+  }
   return lines.join("\r\n");
 }
 

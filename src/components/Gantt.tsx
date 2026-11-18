@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { defaultCalendar, isShutdown, isWorkday, iso, type WorkCalendar } from "@/lib/calendar";
+import { dayOffReason, defaultCalendar, isWorkday, iso, type WorkCalendar } from "@/lib/calendar";
 import { formatDate, taskDelay, todayIso, type Project, type Task } from "@/lib/schedule";
 
 const DAY = 32;
@@ -40,7 +40,16 @@ export function Gantt({ projects, calendar }: { projects: Project[]; calendar?: 
   const columns = Array.from({ length: days }, (_, i) => {
     const d = addDays(start, i);
     const s = iso(d);
-    return { d, s, off: !isWorkday(d, cal), shutdown: !!calendar && isShutdown(s, cal) };
+    const shutdown = calendar
+      ? cal.shutdowns.find((r) => r.start && r.end && s >= r.start && s <= r.end)
+      : undefined;
+    const reason = [
+      dayOffReason(s, cal),
+      shutdown ? `Parada do cliente${shutdown.description ? `: ${shutdown.description}` : ""}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    return { d, s, off: !isWorkday(d, cal), shutdown: !!shutdown, reason };
   });
   const names = new Map(rows.map(({ t }) => [t.id, t.name || "Sem nome"]));
 
@@ -65,11 +74,12 @@ export function Gantt({ projects, calendar }: { projects: Project[]; calendar?: 
           <div className="sticky left-0 z-10 w-60 shrink-0 border-r border-border bg-card px-4 py-2 text-xs uppercase tracking-widest text-muted-foreground">
             Etapa
           </div>
-          {columns.map(({ d, s, off: nonWorking }, i) => (
+          {columns.map(({ d, s, off: nonWorking, reason }, i) => (
             <div
               key={s}
               style={{ width: DAY }}
-              className={`shrink-0 py-1 text-center text-[10px] ${nonWorking ? "text-muted-foreground" : ""}`}
+              title={reason ? `${formatDate(s)}\n${reason}` : undefined}
+              className={`relative shrink-0 py-1 text-center text-[10px] ${nonWorking ? "text-muted-foreground" : ""} ${reason ? "cursor-help" : ""}`}
             >
               {d.getDate() === 1 || i === 0 ? (
                 <div className="font-semibold uppercase">{format(d, "MMM", { locale: ptBR })}</div>
@@ -77,6 +87,9 @@ export function Gantt({ projects, calendar }: { projects: Project[]; calendar?: 
                 <div>&nbsp;</div>
               )}
               {d.getDate()}
+              {reason && (
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />
+              )}
             </div>
           ))}
         </div>
@@ -216,6 +229,9 @@ function Legend({ shutdowns }: { shutdowns: boolean }) {
           <span className="h-3 w-4 bg-primary/10" /> Parada do cliente
         </span>
       )}
+      <span className="flex items-center gap-1.5">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Dia com observação (passe o mouse)
+      </span>
       <span className="flex items-center gap-1.5">
         <span className="h-3 w-0.5 bg-primary" /> Hoje
       </span>

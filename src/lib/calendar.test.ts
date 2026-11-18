@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  dayOffReason,
+  normalizeCalendar,
+  type DayOff,
   addWorkdays,
   defaultCalendar,
   easter,
@@ -39,7 +42,7 @@ describe("working days", () => {
   it("respects custom holidays and blackouts", () => {
     const c = {
       ...cal,
-      holidays: ["2026-11-16"],
+      holidays: [{ date: "2026-11-16", reason: "Aniversário da cidade" }],
       blackouts: [{ id: "b", start: "2026-11-23", end: "2026-11-24", description: "" }],
     };
     expect(workdaysBetween("2026-11-16", "2026-11-27", c)).toBe(6);
@@ -47,5 +50,27 @@ describe("working days", () => {
   it("finds the next working day and adds working days", () => {
     expect(nextWorkday("2026-11-20", cal)).toBe("2026-11-23");
     expect(addWorkdays("2026-11-18", 3, cal)).toBe("2026-11-23"); // 18, 19, (20 holiday), 23
+  });
+});
+
+describe("days off with reasons", () => {
+  it("explains why a day is not worked", () => {
+    const c = {
+      ...cal,
+      holidays: [{ date: "2026-11-16", reason: "Chuva forte, área interditada" }],
+      blackouts: [
+        { id: "b", start: "2026-11-23", end: "2026-11-24", description: "Férias coletivas" },
+      ],
+    };
+    expect(dayOffReason("2026-11-16", c)).toBe("Chuva forte, área interditada");
+    expect(dayOffReason("2026-11-20", c)).toBe(
+      "Feriado nacional: Dia Nacional de Zumbi e da Consciência Negra",
+    );
+    expect(dayOffReason("2026-11-24", c)).toBe("Férias coletivas");
+    expect(dayOffReason("2026-11-17", c)).toBe("");
+  });
+  it("migrates days off saved without a reason", () => {
+    const c = normalizeCalendar({ holidays: ["2026-11-16"] as unknown as DayOff[] });
+    expect(c.holidays).toEqual([{ date: "2026-11-16", reason: "" }]);
   });
 });

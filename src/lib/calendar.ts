@@ -11,15 +11,22 @@ export interface DateRange {
   description: string;
 }
 
+/** A single day without work (local holiday, optional day off...) and why it was not worked. */
+export interface DayOff {
+  date: string;
+  reason: string;
+}
+
 /**
  * Project work calendar.
+ * - `holidays`: extra single days without work, each with its reason.
  * - `blackouts`: periods with no work (e.g. collective vacation, site access blocked).
  * - `shutdowns`: client plant shutdowns. They are working periods, only highlighted on the Gantt.
  */
 export interface WorkCalendar {
   workweek: Workweek;
   nationalHolidays: boolean;
-  holidays: string[];
+  holidays: DayOff[];
   blackouts: DateRange[];
   shutdowns: DateRange[];
 }
@@ -59,17 +66,41 @@ export function easter(year: number): Date {
   return new Date(year, month - 1, day);
 }
 
-const holidayCache = new Map<number, Set<string>>();
+const holidayCache = new Map<number, Map<string, string>>();
 
-/** Brazilian national holidays of a year (fixed dates plus Good Friday). */
-export function nationalHolidays(year: number): Set<string> {
+const FIXED_HOLIDAYS: [string, string][] = [
+  ["01-01", "Confraternização Universal"],
+  ["04-21", "Tiradentes"],
+  ["05-01", "Dia do Trabalho"],
+  ["09-07", "Independência do Brasil"],
+  ["10-12", "Nossa Senhora Aparecida"],
+  ["11-02", "Finados"],
+  ["11-15", "Proclamação da República"],
+  ["11-20", "Dia Nacional de Zumbi e da Consciência Negra"],
+  ["12-25", "Natal"],
+];
+
+/** Brazilian national holidays of a year (fixed dates plus Good Friday), date → name. */
+export function nationalHolidays(year: number): Map<string, string> {
   const cached = holidayCache.get(year);
   if (cached) return cached;
-  const fixed = ["01-01", "04-21", "05-01", "09-07", "10-12", "11-02", "11-15", "11-20", "12-25"];
-  const set = new Set(fixed.map((md) => `${year}-${md}`));
-  set.add(iso(addDays(easter(year), -2)));
-  holidayCache.set(year, set);
-  return set;
+  const map = new Map(FIXED_HOLIDAYS.map(([md, name]) => [`${year}-${md}`, name]));
+  map.set(iso(addDays(easter(year), -2)), "Sexta-feira Santa");
+  holidayCache.set(year, new Map([...map].sort(([a], [b]) => a.localeCompare(b))));
+  return holidayCache.get(year)!;
+}
+
+/** Why a day is not worked ("" when it is a working day or just a weekend). */
+export function dayOffReason(day: string, cal: WorkCalendar): string {
+  const custom = cal.holidays.find((h) => h.date === day);
+  if (custom) return custom.reason || "Dia sem trabalho";
+  if (cal.nationalHolidays) {
+    const name = nationalHolidays(parseISO(day).getFullYear()).get(day);
+    if (name) return `Feriado nacional: ${name}`;
+  }
+  const blackout = cal.blackouts.find((r) => inRange(day, r));
+  if (blackout) return blackout.description || "Bloqueio (sem trabalho)";
+  return "";
 }
 
 const inRange = (day: string, r: DateRange) =>
@@ -82,7 +113,7 @@ export function isWorkday(day: Date | string, cal: WorkCalendar): boolean {
   if (cal.workweek === "mon-sat" && dow === 0) return false;
   const s = iso(d);
   if (cal.nationalHolidays && nationalHolidays(d.getFullYear()).has(s)) return false;
-  if (cal.holidays.includes(s)) return false;
+  if (cal.holidays.some((h) => h.date === s)) return false;
   if (cal.blackouts.some((r) => inRange(s, r))) return false;
   return true;
 }
@@ -123,7 +154,15 @@ export function addWorkdays(start: string, n: number, cal: WorkCalendar): string
 export const normalizeCalendar = (c?: Partial<WorkCalendar>): WorkCalendar => ({
   ...defaultCalendar(),
   ...c,
-  holidays: c?.holidays ?? [],
+  // Older versions stored extra days off as plain date strings, without a reason.
+  holidays: ((c?.holidays ?? []) as (DayOff | string)[])
+    .map((h) =>
+      typeof h === "string"
+        ? { date: h, reason: "" }
+        : { date: h.date ?? "", reason: h.reason ?? "" },
+    )
+    .filter((h) => h.date)
+    .sort((a, b) => a.date.localeCompare(b.date)),
   blackouts: c?.blackouts ?? [],
   shutdowns: c?.shutdowns ?? [],
 });
