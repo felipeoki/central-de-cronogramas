@@ -2,8 +2,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Trash2, CalendarRange } from "lucide-react";
-import { loadProjects, saveProjects, progress, uid, type Project, type Task, type Status } from "@/lib/schedule";
+import { Plus, Trash2, CalendarRange, Pencil } from "lucide-react";
+import { loadProjects, saveProjects, progress, uid, type Project, type ProjectInfo, type Task, type Status } from "@/lib/schedule";
+import { ProjectFormDialog, PROJECT_FIELDS } from "@/components/ProjectFormDialog";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -25,14 +26,15 @@ const DAY = 32;
 function Index() {
   const [projects, setProjects] = useState<Project[] | null>(null);
   const [activeId, setActiveId] = useState<string | "all">("all");
+  const [creating, setCreating] = useState(false);
   useEffect(() => setProjects(loadProjects()), []);
   useEffect(() => { if (projects) saveProjects(projects); }, [projects]);
 
   if (!projects) return <div className="min-h-screen bg-background" />;
 
   const update = (id: string, fn: (p: Project) => Project) => setProjects(projects.map((p) => (p.id === id ? fn(p) : p)));
-  const addProject = () => {
-    const p: Project = { id: uid(), name: `Novo projeto ${projects.length + 1}`, color: projects.length % 5, tasks: [] };
+  const addProject = (info: ProjectInfo) => {
+    const p: Project = { id: uid(), ...info, color: projects.length % 5, tasks: [] };
     setProjects([...projects, p]); setActiveId(p.id);
   };
   const visible = activeId === "all" ? projects : projects.filter((p) => p.id === activeId);
@@ -52,12 +54,19 @@ function Index() {
         <div className="space-y-1">
           {projects.map((p) => (
             <button key={p.id} onClick={() => setActiveId(p.id)} className={`nav-item ${activeId === p.id ? "nav-item-active" : ""}`}>
-              <span className="flex min-w-0 items-center gap-2"><span className={`h-2.5 w-2.5 shrink-0 rounded-full proj-${p.color}`} /><span className="truncate">{p.name}</span></span>
+              <span className="flex min-w-0 items-center gap-2">
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full proj-${p.color}`} />
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate">{p.name}</span>
+                  {p.client && <span className="truncate text-[11px] opacity-70">{p.client}</span>}
+                </span>
+              </span>
               <span className="text-xs opacity-70">{progress(p)}%</span>
             </button>
           ))}
         </div>
-        <button onClick={addProject} className="mt-4 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary">
+        <ProjectFormDialog mode="create" open={creating} onOpenChange={setCreating} onSubmit={addProject} />
+        <button onClick={() => setCreating(true)} className="mt-4 flex w-full items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 text-sm text-muted-foreground hover:border-primary hover:text-primary">
           <Plus className="h-4 w-4" /> Novo projeto
         </button>
       </aside>
@@ -65,7 +74,7 @@ function Index() {
       <main className="min-w-0 flex-1 p-8">
         {active ? (
           <ProjectHeader project={active}
-            onRename={(name) => update(active.id, (p) => ({ ...p, name }))}
+            onSave={(info) => update(active.id, (p) => ({ ...p, ...info }))}
             onDelete={() => { setProjects(projects.filter((p) => p.id !== active.id)); setActiveId("all"); }} />
         ) : (
           <header className="mb-8">
@@ -80,16 +89,34 @@ function Index() {
   );
 }
 
-function ProjectHeader({ project, onRename, onDelete }: { project: Project; onRename: (n: string) => void; onDelete: () => void }) {
+function ProjectHeader({ project, onSave, onDelete }: { project: Project; onSave: (info: ProjectInfo) => void; onDelete: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const details = PROJECT_FIELDS.filter((f) => f.key !== "name");
   return (
-    <header className="mb-8 flex items-end justify-between gap-4">
-      <div className="flex-1">
-        <p className="text-xs uppercase tracking-widest text-muted-foreground">Projeto · {progress(project)}% concluído</p>
-        <input value={project.name} onChange={(e) => onRename(e.target.value)} className="w-full bg-transparent font-display text-5xl outline-none" aria-label="Nome do projeto" />
+    <header className="mb-8">
+      <div className="flex items-end justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">Projeto · {progress(project)}% concluído</p>
+          <h2 className="truncate font-display text-5xl">{project.name || "Sem título"}</h2>
+        </div>
+        <div className="flex shrink-0 items-center gap-4">
+          <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
+            <Pencil className="h-4 w-4" /> Editar dados
+          </button>
+          <button onClick={() => confirm("Excluir este projeto?") && onDelete()} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-destructive">
+            <Trash2 className="h-4 w-4" /> Excluir
+          </button>
+        </div>
       </div>
-      <button onClick={() => confirm("Excluir este projeto?") && onDelete()} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-destructive">
-        <Trash2 className="h-4 w-4" /> Excluir
-      </button>
+      <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
+        {details.map((f) => (
+          <div key={f.key} className="bg-card px-4 py-3">
+            <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">{f.label}</dt>
+            <dd className="mt-0.5 truncate text-sm">{project[f.key] || <span className="text-muted-foreground">—</span>}</dd>
+          </div>
+        ))}
+      </dl>
+      <ProjectFormDialog mode="edit" open={editing} onOpenChange={setEditing} initial={project} onSubmit={onSave} />
     </header>
   );
 }
