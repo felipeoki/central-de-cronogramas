@@ -10,10 +10,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { emptyProjectInfo, type ProjectInfo } from "@/lib/schedule";
+import { PHASES, emptyProjectInfo, type Phase, type ProjectInfo } from "@/lib/schedule";
 import { NumberField } from "@/components/NumberField";
 
-type TextKey = Exclude<keyof ProjectInfo, "orderValue">;
+type TextKey = Exclude<keyof ProjectInfo, "orderValue" | "phase">;
 
 const FIELDS: { key: TextKey; label: string; placeholder: string }[] = [
   { key: "name", label: "Título do projeto", placeholder: "Ex.: Pintura da caldeira 2" },
@@ -47,6 +47,7 @@ export function ProjectFormDialog({
       budget: initial.budget,
       order: initial.order,
       orderValue: initial.orderValue ?? base.orderValue,
+      phase: initial.phase ?? base.phase,
     };
   };
   const [info, setInfo] = useState<ProjectInfo>(pick);
@@ -103,6 +104,21 @@ export function ProjectFormDialog({
                 placeholder="0,00"
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
               />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="project-phase">Fase</Label>
+              <select
+                id="project-phase"
+                value={info.phase}
+                onChange={(e) => setInfo({ ...info, phase: e.target.value as Phase })}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
+              >
+                {Object.entries(PHASES).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
           <DialogFooter>
