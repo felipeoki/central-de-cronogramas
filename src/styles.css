@@ -199,4 +199,10 @@
   .gantt-print { overflow: visible !important; box-shadow: none !important; zoom: var(--gantt-print-zoom, 1); }
   input, select { appearance: none; -webkit-appearance: none; border: 0 !important; background: transparent !important; }
   input::-webkit-calendar-picker-indicator { display: none; }
+
+  /* Print menu: complete, schedule only, or photo report only (body[data-print]). */
+  .photo-report { break-before: page; }
+  body[data-print="schedule"] .photo-report { display: none !important; }
+  body[data-print="photos"] .schedule-print { display: none !important; }
+  body[data-print="photos"] .photo-report { break-before: auto; }
 }

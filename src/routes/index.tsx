@@ -2,7 +2,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Trash2, Pencil, Printer, FileSpreadsheet, Flag } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Printer,
+  FileSpreadsheet,
+  Flag,
+  ChevronDown,
+  Images,
+  CalendarRange,
+  Files,
+} from "lucide-react";
 import ab5Logo from "@/assets/ab5-logo.png";
 import {
   PHASES,
@@ -34,6 +45,19 @@ import { Measurements } from "@/components/Measurements";
 import { SCurve } from "@/components/SCurve";
 import { CalendarSettings } from "@/components/CalendarSettings";
 import { Overview } from "@/components/Overview";
+import {
+  PhotoReport,
+  printProject,
+  projectPhotoIds,
+  type PrintMode,
+} from "@/components/PhotoReport";
+import { prunePhotos } from "@/lib/photos";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -67,7 +91,12 @@ function Index() {
   const [phase, setPhase] = useState<PhaseFilter>("ativos");
   const [client, setClient] = useState("");
   const [manager, setManager] = useState("");
-  useEffect(() => setProjects(loadProjects()), []);
+  useEffect(() => {
+    const loaded = loadProjects();
+    setProjects(loaded);
+    // Drop stored images of photos whose stage or project was deleted.
+    void prunePhotos(new Set(loaded.flatMap(projectPhotoIds)));
+  }, []);
   useEffect(() => {
     if (projects) saveProjects(projects);
   }, [projects]);
@@ -208,30 +237,35 @@ function Index() {
       <main className="min-w-0 flex-1 p-8 print:p-0">
         {active ? (
           <>
-            <ProjectHeader
-              project={active}
-              onSave={(info) => update(active.id, (p) => ({ ...p, ...info }))}
-              onBaseline={() => update(active.id, withBaseline)}
-              onDelete={() => {
-                setProjects(projects.filter((p) => p.id !== active.id));
-                setActiveId("all");
-              }}
-            />
-            <Gantt projects={[active]} calendar={active.calendar} />
-            <StageTable
-              project={active}
-              onChange={(tasks) => updateScheduled(active.id, (p) => ({ ...p, tasks }))}
-              onOrderValueChange={(orderValue) => update(active.id, (p) => ({ ...p, orderValue }))}
-            />
-            <SCurve project={active} />
-            <Measurements
-              project={active}
-              onChange={(measurements) => update(active.id, (p) => ({ ...p, measurements }))}
-            />
-            <CalendarSettings
-              calendar={active.calendar}
-              onChange={(calendar) => updateScheduled(active.id, (p) => ({ ...p, calendar }))}
-            />
+            <div className="schedule-print">
+              <ProjectHeader
+                project={active}
+                onSave={(info) => update(active.id, (p) => ({ ...p, ...info }))}
+                onBaseline={() => update(active.id, withBaseline)}
+                onDelete={() => {
+                  setProjects(projects.filter((p) => p.id !== active.id));
+                  setActiveId("all");
+                }}
+              />
+              <Gantt projects={[active]} calendar={active.calendar} />
+              <StageTable
+                project={active}
+                onChange={(tasks) => updateScheduled(active.id, (p) => ({ ...p, tasks }))}
+                onOrderValueChange={(orderValue) =>
+                  update(active.id, (p) => ({ ...p, orderValue }))
+                }
+              />
+              <SCurve project={active} />
+              <Measurements
+                project={active}
+                onChange={(measurements) => update(active.id, (p) => ({ ...p, measurements }))}
+              />
+              <CalendarSettings
+                calendar={active.calendar}
+                onChange={(calendar) => updateScheduled(active.id, (p) => ({ ...p, calendar }))}
+              />
+            </div>
+            <PhotoReport project={active} />
           </>
         ) : (
           <>
@@ -329,12 +363,7 @@ function ProjectHeader({
           <h2 className="truncate font-display text-4xl">{project.name || "Sem título"}</h2>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-4 print:hidden">
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"
-          >
-            <Printer className="h-4 w-4" /> Imprimir
-          </button>
+          <PrintMenu project={project} />
           <button
             onClick={() => downloadProjectCsv(project)}
             className={btn}
@@ -416,5 +445,58 @@ function ProjectHeader({
         onSubmit={onSave}
       />
     </header>
+  );
+}
+
+const PRINT_OPTIONS: { mode: PrintMode; label: string; hint: string; icon: typeof Printer }[] = [
+  { mode: "all", label: "Completo", hint: "Cronograma + relatório fotográfico", icon: Files },
+  {
+    mode: "schedule",
+    label: "Só o cronograma",
+    hint: "Dados, Gantt, etapas, Curva S e medições",
+    icon: CalendarRange,
+  },
+  {
+    mode: "photos",
+    label: "Relatório fotográfico",
+    hint: "Fotos das etapas no modelo Ab5",
+    icon: Images,
+  },
+];
+
+/** Print button with the A4-landscape print options of a project. */
+function PrintMenu({ project }: { project: Project }) {
+  const photos = projectPhotoIds(project).length;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90">
+        <Printer className="h-4 w-4" /> Imprimir <ChevronDown className="h-3.5 w-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-72">
+        {PRINT_OPTIONS.map((o) => {
+          const disabled = o.mode === "photos" && !photos;
+          return (
+            <DropdownMenuItem
+              key={o.mode}
+              disabled={disabled}
+              onSelect={() => void printProject(project, o.mode)}
+              className="items-start gap-2 py-2"
+            >
+              <o.icon className="mt-0.5 h-4 w-4 text-primary" />
+              <span>
+                <span className="block font-medium">{o.label}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {disabled
+                    ? "Nenhuma foto nas etapas ainda"
+                    : o.mode !== "schedule" && photos
+                      ? `${o.hint} (${photos} foto${photos > 1 ? "s" : ""})`
+                      : o.hint}
+                </span>
+              </span>
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

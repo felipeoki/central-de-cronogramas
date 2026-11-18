@@ -7,6 +7,7 @@ import {
   workdaysBetween,
   type WorkCalendar,
 } from "./calendar";
+import type { PhotoMeta } from "./photos";
 
 export type Status = "todo" | "doing" | "done";
 export type TaskKind = "task" | "milestone";
@@ -36,6 +37,7 @@ export interface Task {
   predecessors: string[];
   crew: number;
   equipment: string;
+  photos: PhotoMeta[];
 }
 
 /** A measurement (boletim de medição) of part of a stage. `percent` is the share of the stage value measured. */
@@ -134,6 +136,11 @@ export function normalizeTask(t: Partial<Task>): Task {
       : [],
     crew: num(t.crew),
     equipment: str(t.equipment),
+    photos: Array.isArray(t.photos)
+      ? t.photos
+          .filter((ph) => ph && typeof ph.id === "string")
+          .map((ph) => ({ id: ph.id, caption: str(ph.caption), date: str(ph.date) }))
+      : [],
   };
 }
 

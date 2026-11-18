@@ -1,7 +1,8 @@
 import { Fragment, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import { Camera, ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
 import { NumberField } from "@/components/NumberField";
+import { StagePhotos } from "@/components/StagePhotos";
 import { nextWorkday, addWorkdays, workdaysBetween } from "@/lib/calendar";
 import {
   executedValue,
@@ -258,6 +259,15 @@ export function StageTable({
                       >
                         {situation.label}
                       </span>
+                      {t.photos.length > 0 && (
+                        <button
+                          onClick={() => toggle(t.id)}
+                          title="Ver fotos da etapa"
+                          className="ml-2 inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-primary print:hidden"
+                        >
+                          <Camera className="h-3.5 w-3.5" /> {t.photos.length}
+                        </button>
+                      )}
                     </td>
                     <td className="px-2 text-right print:hidden">
                       <button
@@ -326,8 +336,9 @@ export function StageTable({
         </p>
       )}
       <p className="mt-2 text-xs text-muted-foreground print:hidden">
-        Clique na seta de uma etapa para editar tipo, dependências, datas reais, equipe e
-        equipamentos. Ao mudar uma data, as etapas que dependem dela são empurradas automaticamente.
+        Clique na seta de uma etapa para editar tipo, dependências, datas reais, equipe,
+        equipamentos e fotos. Ao mudar uma data, as etapas que dependem dela são empurradas
+        automaticamente.
       </p>
     </section>
   );
@@ -476,6 +487,10 @@ function StageDetails({
           </strong>
           {measured > t.progress && " (acima do avanço físico)"}
         </span>
+      </div>
+
+      <div className="border-t border-border pt-3 md:col-span-2 xl:col-span-4">
+        <StagePhotos photos={t.photos} onChange={(photos) => set({ photos })} />
       </div>
     </div>
   );
