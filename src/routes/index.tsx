@@ -3,8 +3,12 @@ import { useEffect, useMemo, useState } from "react";
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Plus, Trash2, CalendarRange, Pencil } from "lucide-react";
-import { loadProjects, saveProjects, progress, uid, type Project, type ProjectInfo, type Task, type Status } from "@/lib/schedule";
+import {
+  loadProjects, saveProjects, progress, uid, stageValue, weightFromValue, totalWeight, formatBRL,
+  type Project, type ProjectInfo, type Task, type Status,
+} from "@/lib/schedule";
 import { ProjectFormDialog, PROJECT_FIELDS } from "@/components/ProjectFormDialog";
+import { NumberField } from "@/components/NumberField";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -83,7 +87,8 @@ function Index() {
           </header>
         )}
         <Gantt projects={visible} />
-        {active && <TaskTable project={active} onChange={(tasks) => update(active.id, (p) => ({ ...p, tasks }))} />}
+        {active && <TaskTable project={active} onChange={(tasks) => update(active.id, (p) => ({ ...p, tasks }))}
+          onOrderValueChange={(orderValue) => update(active.id, (p) => ({ ...p, orderValue }))} />}
       </main>
     </div>
   );
@@ -108,13 +113,17 @@ function ProjectHeader({ project, onSave, onDelete }: { project: Project; onSave
           </button>
         </div>
       </div>
-      <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-4">
+      <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-5">
         {details.map((f) => (
           <div key={f.key} className="bg-card px-4 py-3">
             <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">{f.label}</dt>
             <dd className="mt-0.5 truncate text-sm">{project[f.key] || <span className="text-muted-foreground">—</span>}</dd>
           </div>
         ))}
+        <div className="bg-card px-4 py-3">
+          <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">Valor do pedido</dt>
+          <dd className="mt-0.5 truncate text-sm font-medium">{project.orderValue ? formatBRL(project.orderValue) : <span className="text-muted-foreground">—</span>}</dd>
+        </div>
       </dl>
       <ProjectFormDialog mode="edit" open={editing} onOpenChange={setEditing} initial={project} onSubmit={onSave} />
     </header>
@@ -133,13 +142,13 @@ function Gantt({ projects }: { projects: Project[] }) {
   }, [tasks]);
   const todayOff = differenceInCalendarDays(new Date(), range.start);
 
-  if (!tasks.length) return <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">Nenhuma tarefa com datas ainda. Adicione tarefas abaixo.</div>;
+  if (!tasks.length) return <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">Nenhuma etapa com datas ainda. Adicione etapas abaixo.</div>;
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-soft">
       <div className="relative" style={{ width: 240 + range.days * DAY }}>
         <div className="sticky top-0 flex border-b border-border bg-card">
-          <div className="sticky left-0 z-10 w-60 shrink-0 border-r border-border bg-card px-4 py-2 text-xs uppercase tracking-widest text-muted-foreground">Tarefa</div>
+          <div className="sticky left-0 z-10 w-60 shrink-0 border-r border-border bg-card px-4 py-2 text-xs uppercase tracking-widest text-muted-foreground">Etapa</div>
           {Array.from({ length: range.days }).map((_, i) => {
             const d = addDays(range.start, i);
             return (
@@ -174,43 +183,85 @@ function Gantt({ projects }: { projects: Project[] }) {
   );
 }
 
-function TaskTable({ project, onChange }: { project: Project; onChange: (t: Task[]) => void }) {
+function TaskTable({ project, onChange, onOrderValueChange }: {
+  project: Project; onChange: (t: Task[]) => void; onOrderValueChange: (v: number) => void;
+}) {
   const set = (id: string, patch: Partial<Task>) => onChange(project.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   const add = () => {
     const last = project.tasks.at(-1);
     const start = last?.end ? addDays(parseISO(last.end), 1) : new Date();
-    onChange([...project.tasks, { id: uid(), name: "", start: format(start, "yyyy-MM-dd"), end: format(addDays(start, 4), "yyyy-MM-dd"), status: "todo", owner: "" }]);
+    const remaining = Math.max(0, 100 - totalWeight(project));
+    onChange([...project.tasks, { id: uid(), name: "", start: format(start, "yyyy-MM-dd"), end: format(addDays(start, 4), "yyyy-MM-dd"), status: "todo", owner: "", weight: remaining }]);
   };
+  const total = totalWeight(project);
+  const totalValue = project.tasks.reduce((s, t) => s + stageValue(project.orderValue, t.weight), 0);
+  const hasValue = project.orderValue > 0;
   return (
     <section className="mt-10">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-display text-2xl">Tarefas</h3>
-        <button onClick={add} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"><Plus className="h-4 w-4" /> Adicionar tarefa</button>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-display text-2xl">Etapas do cronograma</h3>
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            Valor do pedido R$
+            <NumberField value={project.orderValue} onValueChange={onOrderValueChange} aria-label="Valor total do pedido"
+              className="w-36 rounded-md border border-border bg-card px-2 py-1.5 text-right text-foreground outline-none focus:border-primary" />
+          </label>
+          <button onClick={add} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90"><Plus className="h-4 w-4" /> Adicionar etapa</button>
+        </div>
       </div>
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <table className="w-full min-w-[860px] text-sm">
           <thead className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr><th className="px-3 py-2">Tarefa</th><th className="px-3 py-2">Responsável</th><th className="px-3 py-2">Início</th><th className="px-3 py-2">Fim</th><th className="px-3 py-2">Status</th><th /></tr>
+            <tr>
+              <th className="px-3 py-2">Etapa</th><th className="px-3 py-2">Responsável</th><th className="px-3 py-2">Início</th><th className="px-3 py-2">Fim</th>
+              <th className="w-24 px-3 py-2 text-right">Peso (%)</th><th className="w-36 px-3 py-2 text-right">Valor (R$)</th>
+              <th className="px-3 py-2">Status</th><th />
+            </tr>
           </thead>
           <tbody>
             {project.tasks.map((t) => (
               <tr key={t.id} className="border-t border-border">
-                <td className="px-1"><input className="cell" placeholder="Nome da tarefa" value={t.name} onChange={(e) => set(t.id, { name: e.target.value })} /></td>
+                <td className="px-1"><input className="cell" placeholder="Nome da etapa" value={t.name} onChange={(e) => set(t.id, { name: e.target.value })} /></td>
                 <td className="px-1"><input className="cell" placeholder="—" value={t.owner} onChange={(e) => set(t.id, { owner: e.target.value })} /></td>
                 <td className="px-1"><input type="date" className="cell" value={t.start} onChange={(e) => set(t.id, { start: e.target.value })} /></td>
                 <td className="px-1"><input type="date" className="cell" value={t.end} min={t.start} onChange={(e) => set(t.id, { end: e.target.value })} /></td>
+                <td className="px-1"><NumberField className="cell text-right" decimals={4} value={t.weight} aria-label="Peso da etapa (%)"
+                  onValueChange={(weight) => set(t.id, { weight })} /></td>
+                <td className="px-1">
+                  <NumberField className="cell text-right disabled:cursor-not-allowed disabled:opacity-60" value={stageValue(project.orderValue, t.weight)}
+                    aria-label="Valor da etapa (R$)" disabled={!hasValue} title={hasValue ? undefined : "Informe o valor do pedido para editar o valor da etapa"}
+                    onValueChange={(v) => set(t.id, { weight: weightFromValue(project.orderValue, v) })} />
+                </td>
                 <td className="px-1">
                   <select className="cell" value={t.status} onChange={(e) => set(t.id, { status: e.target.value as Status })}>
                     {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </td>
-                <td className="px-2 text-right"><button aria-label="Excluir tarefa" onClick={() => onChange(project.tasks.filter((x) => x.id !== t.id))} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button></td>
+                <td className="px-2 text-right"><button aria-label="Excluir etapa" onClick={() => onChange(project.tasks.filter((x) => x.id !== t.id))} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button></td>
               </tr>
             ))}
-            {!project.tasks.length && <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">Nenhuma tarefa ainda.</td></tr>}
+            {!project.tasks.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Nenhuma etapa ainda.</td></tr>}
           </tbody>
+          {project.tasks.length > 0 && (
+            <tfoot className="border-t-2 border-border bg-muted/50 font-medium">
+              <tr>
+                <td colSpan={4} className="px-3 py-2 text-xs uppercase tracking-wider text-muted-foreground">Total</td>
+                <td className={`px-3 py-2 text-right ${total === 100 ? "" : "text-destructive"}`}>{total.toLocaleString("pt-BR")}%</td>
+                <td className="px-3 py-2 text-right">{formatBRL(totalValue)}</td>
+                <td colSpan={2} />
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
+      {project.tasks.length > 0 && total !== 100 && (
+        <p className="mt-2 text-sm text-destructive">
+          A soma dos pesos é {total.toLocaleString("pt-BR")}% — {total < 100 ? `faltam ${(Math.round((100 - total) * 100) / 100).toLocaleString("pt-BR")}%` : `excede em ${(Math.round((total - 100) * 100) / 100).toLocaleString("pt-BR")}%`} para fechar 100% do pedido.
+        </p>
+      )}
+      {!hasValue && project.tasks.length > 0 && (
+        <p className="mt-2 text-sm text-muted-foreground">Informe o valor do pedido para calcular o valor de cada etapa.</p>
+      )}
     </section>
   );
 }

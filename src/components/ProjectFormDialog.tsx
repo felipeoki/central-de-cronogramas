@@ -11,8 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { emptyProjectInfo, type ProjectInfo } from "@/lib/schedule";
+import { NumberField } from "@/components/NumberField";
 
-const FIELDS: { key: keyof ProjectInfo; label: string; placeholder: string }[] = [
+type TextKey = Exclude<keyof ProjectInfo, "orderValue">;
+
+const FIELDS: { key: TextKey; label: string; placeholder: string }[] = [
   { key: "name", label: "Título do projeto", placeholder: "Ex.: Pintura da caldeira 2" },
   { key: "client", label: "Cliente", placeholder: "Nome do cliente" },
   { key: "manager", label: "Responsável", placeholder: "Quem conduz o projeto" },
@@ -33,18 +36,32 @@ export function ProjectFormDialog({
   onSubmit: (info: ProjectInfo) => void;
   mode: "create" | "edit";
 }) {
-  const [info, setInfo] = useState<ProjectInfo>(initial ?? emptyProjectInfo());
+  // `initial` may be a whole Project: keep only the registration fields.
+  const pick = (): ProjectInfo => {
+    const base = emptyProjectInfo();
+    if (!initial) return base;
+    return {
+      name: initial.name,
+      client: initial.client,
+      manager: initial.manager,
+      budget: initial.budget,
+      order: initial.order,
+      orderValue: initial.orderValue ?? base.orderValue,
+    };
+  };
+  const [info, setInfo] = useState<ProjectInfo>(pick);
   // Reset the form each time the dialog opens (not on every parent render, which would wipe typing).
   useEffect(() => {
-    if (open) setInfo(initial ?? emptyProjectInfo());
+    if (open) setInfo(pick());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const trimmed = Object.fromEntries(
-      Object.entries(info).map(([k, v]) => [k, v.trim()]),
-    ) as ProjectInfo;
+    const trimmed: ProjectInfo = {
+      ...info,
+      ...Object.fromEntries(FIELDS.map((f) => [f.key, info[f.key].trim()])),
+    };
     if (!trimmed.name) return;
     onSubmit(trimmed);
     onOpenChange(false);
@@ -77,6 +94,16 @@ export function ProjectFormDialog({
                 />
               </div>
             ))}
+            <div className="space-y-1.5">
+              <Label htmlFor="project-orderValue">Valor total do pedido (R$)</Label>
+              <NumberField
+                id="project-orderValue"
+                value={info.orderValue}
+                onValueChange={(orderValue) => setInfo((cur) => ({ ...cur, orderValue }))}
+                placeholder="0,00"
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
