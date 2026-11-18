@@ -483,3 +483,11 @@ export function parseBRNumber(text: string): number {
 /** Number shown in pt-BR style for editing ("1234,5"). */
 export const formatBRNumber = (n: number, decimals = 2) =>
   n.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: decimals });
+
+/** Copy of `items` with the element at `from` moved to index `to`. */
+export function moveItem<T>(items: T[], from: number, to: number): T[] {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  if (item !== undefined) next.splice(Math.max(0, Math.min(to, next.length)), 0, item);
+  return next;
+}

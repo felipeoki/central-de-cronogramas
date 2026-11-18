@@ -1,6 +1,17 @@
 import { Fragment, useState } from "react";
 import { addDays, format, parseISO } from "date-fns";
-import { Camera, ChevronDown, ChevronRight, Plus, Trash2, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowDownUp,
+  ArrowUp,
+  Camera,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import { NumberField } from "@/components/NumberField";
 import { StagePhotos } from "@/components/StagePhotos";
 import { nextWorkday, addWorkdays, workdaysBetween } from "@/lib/calendar";
@@ -9,6 +20,7 @@ import {
   formatBRL,
   formatDate,
   measuredPercent,
+  moveItem,
   newTask,
   physicalProgress,
   stageValue,
@@ -86,6 +98,28 @@ export function StageTable({
     onChange([...project.tasks, t]);
   };
 
+  /** Moves the stage at `from` to position `to` (order shown in the table, Gantt, prints and exports). */
+  const move = (from: number, to: number) => {
+    if (from === to || to < 0 || to >= project.tasks.length) return;
+    onChange(moveItem(project.tasks, from, to));
+  };
+  const sortByDate = () =>
+    onChange(
+      [...project.tasks].sort(
+        (a, b) =>
+          (a.start || "9999").localeCompare(b.start || "9999") ||
+          (a.end || "9999").localeCompare(b.end || "9999"),
+      ),
+    );
+  const [armed, setArmed] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  const endDrag = () => {
+    setArmed(null);
+    setDragId(null);
+    setOverId(null);
+  };
+
   const remove = (id: string) =>
     onChange(
       project.tasks
@@ -115,6 +149,14 @@ export function StageTable({
             />
           </label>
           <button
+            onClick={sortByDate}
+            disabled={project.tasks.length < 2}
+            title="Reorganiza as etapas pela data de início"
+            className="flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:border-primary hover:text-primary disabled:opacity-50"
+          >
+            <ArrowDownUp className="h-4 w-4" /> Ordenar por data
+          </button>
+          <button
             onClick={() => add("milestone")}
             className="flex items-center gap-1 rounded-md border border-border bg-card px-3 py-1.5 text-sm hover:border-primary hover:text-primary"
           >
@@ -133,7 +175,7 @@ export function StageTable({
         <table className="w-full min-w-[1040px] text-sm print:min-w-0 print:text-xs">
           <thead className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
-              <th className="w-8 print:hidden" />
+              <th className="w-14 print:hidden" />
               <th className="px-3 py-2">Etapa</th>
               <th className="px-3 py-2">Responsável</th>
               <th className="px-3 py-2">Início</th>
@@ -152,25 +194,66 @@ export function StageTable({
             </tr>
           </thead>
           <tbody>
-            {project.tasks.map((t) => {
+            {project.tasks.map((t, index) => {
               const milestone = t.kind === "milestone";
               const situation = taskSituation(t, cal, today);
               const expanded = open.has(t.id);
+              const dropHere = overId === t.id && dragId !== t.id;
+              const fromIndex = project.tasks.findIndex((x) => x.id === dragId);
               return (
                 <Fragment key={t.id}>
-                  <tr className="border-t border-border">
-                    <td className="pl-2 print:hidden">
-                      <button
-                        aria-label={expanded ? "Ocultar detalhes" : "Mostrar detalhes"}
-                        onClick={() => toggle(t.id)}
-                        className="text-muted-foreground hover:text-primary"
-                      >
-                        {expanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </button>
+                  <tr
+                    className={`border-t border-border ${dragId === t.id ? "opacity-40" : ""} ${
+                      dropHere
+                        ? fromIndex > index
+                          ? "shadow-[inset_0_2px_0_var(--ab5-red)]"
+                          : "shadow-[inset_0_-2px_0_var(--ab5-red)]"
+                        : ""
+                    }`}
+                    draggable={armed === t.id}
+                    onDragStart={(e) => {
+                      setDragId(t.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", t.id);
+                    }}
+                    onDragOver={(e) => {
+                      if (!dragId) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (overId !== t.id) setOverId(t.id);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (fromIndex >= 0) move(fromIndex, index);
+                      endDrag();
+                    }}
+                    onDragEnd={endDrag}
+                  >
+                    <td className="pl-1 print:hidden">
+                      <div className="flex items-center">
+                        <span
+                          role="button"
+                          tabIndex={-1}
+                          aria-label="Arrastar para mudar a posição"
+                          title="Arraste para mudar a posição"
+                          onMouseDown={() => setArmed(t.id)}
+                          onMouseUp={() => !dragId && setArmed(null)}
+                          className="cursor-grab text-muted-foreground hover:text-primary active:cursor-grabbing"
+                        >
+                          <GripVertical className="h-4 w-4" />
+                        </span>
+                        <button
+                          aria-label={expanded ? "Ocultar detalhes" : "Mostrar detalhes"}
+                          onClick={() => toggle(t.id)}
+                          className="text-muted-foreground hover:text-primary"
+                        >
+                          {expanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-1">
                       <div className="flex items-center">
@@ -269,13 +352,31 @@ export function StageTable({
                         </button>
                       )}
                     </td>
-                    <td className="px-2 text-right print:hidden">
+                    <td className="whitespace-nowrap px-2 text-right print:hidden">
+                      <button
+                        aria-label="Mover etapa para cima"
+                        title="Mover para cima"
+                        disabled={index === 0}
+                        onClick={() => move(index, index - 1)}
+                        className="text-muted-foreground hover:text-primary disabled:opacity-25"
+                      >
+                        <ArrowUp className="h-4 w-4" />
+                      </button>
+                      <button
+                        aria-label="Mover etapa para baixo"
+                        title="Mover para baixo"
+                        disabled={index === project.tasks.length - 1}
+                        onClick={() => move(index, index + 1)}
+                        className="ml-1 text-muted-foreground hover:text-primary disabled:opacity-25"
+                      >
+                        <ArrowDown className="h-4 w-4" />
+                      </button>
                       <button
                         aria-label="Excluir etapa"
                         onClick={() =>
                           confirm(`Excluir "${t.name || "etapa sem nome"}"?`) && remove(t.id)
                         }
-                        className="text-muted-foreground hover:text-destructive"
+                        className="ml-2 text-muted-foreground hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -337,8 +438,8 @@ export function StageTable({
       )}
       <p className="mt-2 text-xs text-muted-foreground print:hidden">
         Clique na seta de uma etapa para editar tipo, dependências, datas reais, equipe,
-        equipamentos e fotos. Ao mudar uma data, as etapas que dependem dela são empurradas
-        automaticamente.
+        equipamentos e fotos. Arraste pelo ícone ⋮⋮ ou use as setas ↑↓ para mudar a posição. Ao
+        mudar uma data, as etapas que dependem dela são empurradas automaticamente.
       </p>
     </section>
   );

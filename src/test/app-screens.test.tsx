@@ -85,3 +85,19 @@ describe("app screens", () => {
     expect(createObjectURL).toHaveBeenCalledOnce();
   });
 });
+
+describe("stage order", () => {
+  it("moves a stage with the arrow buttons and sorts by date", () => {
+    render(<Index />);
+    fireEvent.click(screen.getAllByRole("button", { name: /Projeto exemplo/ })[0]!);
+    const names = () =>
+      screen
+        .getAllByPlaceholderText(/Nome da etapa|Nome do marco/)
+        .map((i) => (i as HTMLInputElement).value);
+    const first = names()[0];
+    fireEvent.click(screen.getAllByRole("button", { name: "Mover etapa para baixo" })[0]!);
+    expect(names()[1]).toBe(first);
+    fireEvent.click(screen.getByRole("button", { name: /Ordenar por data/ }));
+    expect(names()[0]).toBe(first);
+  });
+});

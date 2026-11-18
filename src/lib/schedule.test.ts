@@ -4,6 +4,7 @@ import { csvCell, projectCsv } from "./export";
 import {
   executedValue,
   measuredValue,
+  moveItem,
   newTask,
   normalizeProject,
   parseBRNumber,
@@ -156,5 +157,12 @@ describe("CSV export", () => {
     );
     expect(csv).toContain("Valor do pedido (R$);1000,5");
     expect(csv).toContain("Pintura;Etapa;;16/11/2026;27/11/2026;9;12,5;125,06");
+  });
+});
+
+describe("moveItem", () => {
+  it("moves an element up or down", () => {
+    expect(moveItem(["a", "b", "c", "d"], 3, 1)).toEqual(["a", "d", "b", "c"]);
+    expect(moveItem(["a", "b", "c", "d"], 0, 2)).toEqual(["b", "c", "a", "d"]);
   });
 });
