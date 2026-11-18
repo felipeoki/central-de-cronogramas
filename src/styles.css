@@ -30,8 +30,9 @@
  */
 
 @theme inline {
-  --font-display: "Instrument Serif", serif;
-  --font-sans: "Work Sans", sans-serif;
+  /* Manual de Marca Ab5: Helvetica Neue, com Arial como substituta. */
+  --font-display: "Helvetica Neue", Arial, Helvetica, sans-serif;
+  --font-sans: "Helvetica Neue", Arial, Helvetica, sans-serif;
   --shadow-soft: var(--shadow-soft-v);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -76,40 +77,51 @@
 }
 
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.965 0.008 85);
-  --foreground: oklch(0.2 0.01 60);
-  --card: oklch(0.99 0.004 85);
-  --card-foreground: oklch(0.2 0.01 60);
-  --popover: oklch(0.99 0.004 85);
-  --popover-foreground: oklch(0.2 0.01 60);
-  --primary: oklch(0.22 0.01 60);
-  --primary-foreground: oklch(0.98 0.005 85);
-  --secondary: oklch(0.92 0.01 80);
-  --secondary-foreground: oklch(0.2 0.01 60);
-  --muted: oklch(0.93 0.01 80);
-  --muted-foreground: oklch(0.5 0.015 60);
-  --accent: oklch(0.92 0.01 80);
-  --accent-foreground: oklch(0.2 0.01 60);
-  --destructive: oklch(0.58 0.2 30);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.012 80);
-  --input: oklch(0.88 0.012 80);
-  --ring: oklch(0.4 0.01 60);
-  --chart-1: oklch(0.32 0.02 60);
-  --chart-2: oklch(0.6 0.14 40);
-  --chart-3: oklch(0.52 0.08 150);
-  --chart-4: oklch(0.5 0.09 240);
-  --chart-5: oklch(0.68 0.12 80);
-  --sidebar: oklch(0.94 0.01 82);
-  --sidebar-foreground: oklch(0.2 0.01 60);
-  --sidebar-primary: oklch(0.22 0.01 60);
-  --sidebar-primary-foreground: oklch(0.98 0.005 85);
-  --sidebar-accent: oklch(0.9 0.012 80);
-  --sidebar-accent-foreground: oklch(0.2 0.01 60);
-  --sidebar-border: oklch(0.88 0.012 80);
-  --sidebar-ring: oklch(0.4 0.01 60);
-  --shadow-soft-v: 0 10px 30px -15px oklch(0.2 0.01 60 / 0.2);
+  /*
+   * Paleta Ab5 (Manual de Marca): vermelho #ED1C24, preto #0A0A0A,
+   * cinzas #313133 / #7A7A7A / #DADADA, fundo de tabela #F0F0F0.
+   */
+  --radius: 0.375rem;
+  --ab5-red: oklch(0.603 0.235 27); /* #ED1C24 */
+  --ab5-red-dark: oklch(0.493 0.192 26.4); /* #B5121B */
+  --ab5-black: oklch(0.145 0 0); /* #0A0A0A */
+  --ab5-graphite: oklch(0.314 0.004 286.2); /* #313133 */
+  --ab5-gray: oklch(0.58 0 0); /* #7A7A7A */
+  --ab5-light: oklch(0.888 0 0); /* #DADADA */
+  --ab5-table: oklch(0.955 0 0); /* #F0F0F0 */
+  --background: oklch(0.975 0 0);
+  --foreground: var(--ab5-black);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--ab5-black);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--ab5-black);
+  --primary: var(--ab5-red);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: var(--ab5-table);
+  --secondary-foreground: var(--ab5-black);
+  --muted: var(--ab5-table);
+  --muted-foreground: var(--ab5-gray);
+  --accent: var(--ab5-table);
+  --accent-foreground: var(--ab5-black);
+  --destructive: var(--ab5-red-dark);
+  --destructive-foreground: oklch(1 0 0);
+  --border: var(--ab5-light);
+  --input: var(--ab5-light);
+  --ring: var(--ab5-red);
+  --chart-1: var(--ab5-red);
+  --chart-2: var(--ab5-graphite);
+  --chart-3: var(--ab5-gray);
+  --chart-4: var(--ab5-red-dark);
+  --chart-5: var(--ab5-black);
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: var(--ab5-black);
+  --sidebar-primary: var(--ab5-black);
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: var(--ab5-table);
+  --sidebar-accent-foreground: var(--ab5-black);
+  --sidebar-border: var(--ab5-light);
+  --sidebar-ring: var(--ab5-red);
+  --shadow-soft-v: 0 10px 30px -15px oklch(0.145 0 0 / 0.18);
 }
 
 .dark {
@@ -169,8 +181,22 @@
   border-radius: var(--radius); padding: 0.5rem 0.75rem; font-size: 0.875rem; text-align: left;
   &:hover { background: var(--sidebar-accent); }
 }
-@utility nav-item-active { background: var(--primary) !important; color: var(--primary-foreground); }
+@utility nav-item-active {
+  background: var(--sidebar-primary) !important; color: var(--sidebar-primary-foreground);
+  box-shadow: inset 3px 0 0 var(--ab5-red);
+}
 @utility cell {
   width: 100%; background: transparent; padding: 0.5rem; border-radius: calc(var(--radius) - 2px); outline: none;
   &:focus { background: var(--muted); }
+}
+.font-display { font-weight: 700; letter-spacing: -0.02em; }
+
+/* Impressão do projeto: A4 paisagem, só o conteúdo do cronograma. */
+@page { size: A4 landscape; margin: 10mm; }
+@media print {
+  html, body { background: #fff !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .gantt-print { overflow: visible !important; box-shadow: none !important; zoom: var(--gantt-print-zoom, 1); }
+  input, select { appearance: none; -webkit-appearance: none; border: 0 !important; background: transparent !important; }
+  input::-webkit-calendar-picker-indicator { display: none; }
 }

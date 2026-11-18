@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Plus, Trash2, CalendarRange, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil, Printer } from "lucide-react";
+import ab5Logo from "@/assets/ab5-logo.png";
 import {
   loadProjects, saveProjects, progress, uid, stageValue, weightFromValue, totalWeight, formatBRL,
   type Project, type ProjectInfo, type Task, type Status,
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/")({
 
 const STATUS: Record<Status, string> = { todo: "A fazer", doing: "Em andamento", done: "Concluído" };
 const DAY = 32;
+const PRINT_WIDTH = 1040;
 
 function Index() {
   const [projects, setProjects] = useState<Project[] | null>(null);
@@ -46,10 +48,10 @@ function Index() {
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <aside className="w-72 shrink-0 border-r border-border bg-sidebar p-6">
-        <div className="mb-10 flex items-center gap-2">
-          <CalendarRange className="h-5 w-5 text-primary" />
-          <h1 className="font-display text-3xl leading-none">Cronogramas</h1>
+      <aside className="w-72 shrink-0 border-r border-border bg-sidebar p-6 print:hidden">
+        <div className="mb-10 border-b-2 border-primary pb-5">
+          <img src={ab5Logo} alt="Ab5 Indústria e Comércio" className="h-14 w-auto" />
+          <h1 className="font-display mt-3 text-xl leading-tight">Central de Cronogramas</h1>
         </div>
         <button onClick={() => setActiveId("all")} className={`nav-item ${activeId === "all" ? "nav-item-active" : ""}`}>
           Visão geral <span className="text-xs opacity-70">{projects.length}</span>
@@ -75,7 +77,7 @@ function Index() {
         </button>
       </aside>
 
-      <main className="min-w-0 flex-1 p-8">
+      <main className="min-w-0 flex-1 p-8 print:p-0">
         {active ? (
           <ProjectHeader project={active}
             onSave={(info) => update(active.id, (p) => ({ ...p, ...info }))}
@@ -83,7 +85,7 @@ function Index() {
         ) : (
           <header className="mb-8">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">Todos os projetos</p>
-            <h2 className="font-display text-5xl">Visão geral</h2>
+            <h2 className="font-display text-4xl">Visão geral</h2>
           </header>
         )}
         <Gantt projects={visible} />
@@ -98,13 +100,23 @@ function ProjectHeader({ project, onSave, onDelete }: { project: Project; onSave
   const [editing, setEditing] = useState(false);
   const details = PROJECT_FIELDS.filter((f) => f.key !== "name");
   return (
-    <header className="mb-8">
+    <header className="mb-8 print:mb-4">
+      <div className="mb-4 hidden items-center justify-between border-b-2 border-primary pb-3 print:flex">
+        <img src={ab5Logo} alt="Ab5 Indústria e Comércio" className="h-12 w-auto" />
+        <div className="text-right text-xs text-muted-foreground">
+          <p className="font-display text-base text-foreground">Cronograma do projeto</p>
+          <p>Emitido em {format(new Date(), "dd/MM/yyyy", { locale: ptBR })}</p>
+        </div>
+      </div>
       <div className="flex items-end justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="text-xs uppercase tracking-widest text-muted-foreground">Projeto · {progress(project)}% concluído</p>
-          <h2 className="truncate font-display text-5xl">{project.name || "Sem título"}</h2>
+          <h2 className="truncate font-display text-4xl">{project.name || "Sem título"}</h2>
         </div>
-        <div className="flex shrink-0 items-center gap-4">
+        <div className="flex shrink-0 items-center gap-4 print:hidden">
+          <button onClick={() => window.print()} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-sm text-primary-foreground hover:opacity-90">
+            <Printer className="h-4 w-4" /> Imprimir
+          </button>
           <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary">
             <Pencil className="h-4 w-4" /> Editar dados
           </button>
@@ -113,7 +125,7 @@ function ProjectHeader({ project, onSave, onDelete }: { project: Project; onSave
           </button>
         </div>
       </div>
-      <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-5">
+      <dl className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-5 print:grid-cols-5">
         {details.map((f) => (
           <div key={f.key} className="bg-card px-4 py-3">
             <dt className="text-[11px] uppercase tracking-widest text-muted-foreground">{f.label}</dt>
@@ -144,9 +156,14 @@ function Gantt({ projects }: { projects: Project[] }) {
 
   if (!tasks.length) return <div className="rounded-lg border border-dashed border-border p-12 text-center text-muted-foreground">Nenhuma etapa com datas ainda. Adicione etapas abaixo.</div>;
 
+  const width = 240 + range.days * DAY;
+  // In print, shrink the chart to fit the A4 landscape printable width (~1040 CSS px).
+  const printZoom = Math.min(1, PRINT_WIDTH / width);
+
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card shadow-soft">
-      <div className="relative" style={{ width: 240 + range.days * DAY }}>
+    <div className="gantt-print overflow-x-auto rounded-lg border border-border bg-card shadow-soft"
+      style={{ "--gantt-print-zoom": printZoom } as CSSProperties}>
+      <div className="relative" style={{ width }}>
         <div className="sticky top-0 flex border-b border-border bg-card">
           <div className="sticky left-0 z-10 w-60 shrink-0 border-r border-border bg-card px-4 py-2 text-xs uppercase tracking-widest text-muted-foreground">Etapa</div>
           {Array.from({ length: range.days }).map((_, i) => {
@@ -197,10 +214,10 @@ function TaskTable({ project, onChange, onOrderValueChange }: {
   const totalValue = project.tasks.reduce((s, t) => s + stageValue(project.orderValue, t.weight), 0);
   const hasValue = project.orderValue > 0;
   return (
-    <section className="mt-10">
+    <section className="mt-10 print:mt-6 print:break-inside-avoid">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-display text-2xl">Etapas do cronograma</h3>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 print:hidden">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             Valor do pedido R$
             <NumberField value={project.orderValue} onValueChange={onOrderValueChange} aria-label="Valor total do pedido"
@@ -210,12 +227,12 @@ function TaskTable({ project, onChange, onOrderValueChange }: {
         </div>
       </div>
       <div className="overflow-x-auto rounded-lg border border-border bg-card">
-        <table className="w-full min-w-[860px] text-sm">
+        <table className="w-full min-w-[860px] text-sm print:min-w-0">
           <thead className="bg-muted text-left text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
               <th className="px-3 py-2">Etapa</th><th className="px-3 py-2">Responsável</th><th className="px-3 py-2">Início</th><th className="px-3 py-2">Fim</th>
               <th className="w-24 px-3 py-2 text-right">Peso (%)</th><th className="w-36 px-3 py-2 text-right">Valor (R$)</th>
-              <th className="px-3 py-2">Status</th><th />
+              <th className="px-3 py-2">Status</th><th className="print:hidden" />
             </tr>
           </thead>
           <tbody>
@@ -237,7 +254,7 @@ function TaskTable({ project, onChange, onOrderValueChange }: {
                     {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </td>
-                <td className="px-2 text-right"><button aria-label="Excluir etapa" onClick={() => onChange(project.tasks.filter((x) => x.id !== t.id))} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button></td>
+                <td className="px-2 text-right print:hidden"><button aria-label="Excluir etapa" onClick={() => onChange(project.tasks.filter((x) => x.id !== t.id))} className="text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button></td>
               </tr>
             ))}
             {!project.tasks.length && <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Nenhuma etapa ainda.</td></tr>}
@@ -260,7 +277,7 @@ function TaskTable({ project, onChange, onOrderValueChange }: {
         </p>
       )}
       {!hasValue && project.tasks.length > 0 && (
-        <p className="mt-2 text-sm text-muted-foreground">Informe o valor do pedido para calcular o valor de cada etapa.</p>
+        <p className="mt-2 text-sm text-muted-foreground print:hidden">Informe o valor do pedido para calcular o valor de cada etapa.</p>
       )}
     </section>
   );

@@ -72,7 +72,7 @@ export function ProjectFormDialog({
       <DialogContent className="sm:max-w-lg">
         <form onSubmit={submit} className="space-y-5">
           <DialogHeader>
-            <DialogTitle className="font-display text-3xl font-normal">
+            <DialogTitle className="font-display text-2xl">
               {mode === "create" ? "Novo projeto" : "Dados do projeto"}
             </DialogTitle>
             <DialogDescription>Preencha as informações de cadastro do projeto.</DialogDescription>
