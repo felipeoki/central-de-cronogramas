@@ -205,4 +205,8 @@
   body[data-print="schedule"] .photo-report { display: none !important; }
   body[data-print="photos"] .schedule-print { display: none !important; }
   body[data-print="photos"] .photo-report { break-before: auto; }
+  /* Leaders' version: only the value-free report prints. */
+  body[data-print="leaders"] .leader-report { display: block !important; }
+  body[data-print="leaders"] .schedule-print,
+  body[data-print="leaders"] .photo-report { display: none !important; }
 }

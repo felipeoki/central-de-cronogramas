@@ -11,6 +11,7 @@ import {
   Flag,
   ChevronDown,
   Images,
+  EyeOff,
   CalendarRange,
   Files,
 } from "lucide-react";
@@ -52,6 +53,7 @@ import {
   type PrintMode,
 } from "@/components/PhotoReport";
 import { prunePhotos } from "@/lib/photos";
+import { LeaderReport } from "@/components/LeaderReport";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -266,6 +268,7 @@ function Index() {
               />
             </div>
             <PhotoReport project={active} />
+            <LeaderReport project={active} />
           </>
         ) : (
           <>
@@ -462,6 +465,12 @@ const PRINT_OPTIONS: { mode: PrintMode; label: string; hint: string; icon: typeo
     hint: "Fotos das etapas no modelo Ab5",
     icon: Images,
   },
+  {
+    mode: "leaders",
+    label: "Para líderes (sem valores)",
+    hint: "Datas detalhadas, avanço e situação, sem nenhum valor",
+    icon: EyeOff,
+  },
 ];
 
 /** Print button with the A4-landscape print options of a project. */
@@ -488,7 +497,7 @@ function PrintMenu({ project }: { project: Project }) {
                 <span className="block text-xs text-muted-foreground">
                   {disabled
                     ? "Nenhuma foto nas etapas ainda"
-                    : o.mode !== "schedule" && photos
+                    : (o.mode === "all" || o.mode === "photos") && photos
                       ? `${o.hint} (${photos} foto${photos > 1 ? "s" : ""})`
                       : o.hint}
                 </span>

@@ -5,7 +5,7 @@ import { PhotoImage } from "@/components/StagePhotos";
 import { loadPhotos } from "@/lib/photos";
 import { PHASES, formatDate, type Project } from "@/lib/schedule";
 
-export type PrintMode = "all" | "schedule" | "photos";
+export type PrintMode = "all" | "schedule" | "photos" | "leaders";
 
 export const projectPhotoIds = (p: Project) => p.tasks.flatMap((t) => t.photos.map((ph) => ph.id));
 
@@ -14,7 +14,7 @@ export const projectPhotoIds = (p: Project) => p.tasks.flatMap((t) => t.photos.m
  * photos are loaded first so none is missing from the printout.
  */
 export async function printProject(p: Project | undefined, mode: PrintMode) {
-  if (p && mode !== "schedule") await loadPhotos(projectPhotoIds(p));
+  if (p && (mode === "all" || mode === "photos")) await loadPhotos(projectPhotoIds(p));
   document.body.dataset["print"] = mode;
   // Let React paint the loaded images before the print dialog snapshots the page.
   await new Promise((r) => setTimeout(r, 150));
